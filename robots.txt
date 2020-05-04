@@ -5,9 +5,9 @@ Allow: /archives/
 Allow: /gallery/
 Allow: /about/
 Allow: /links/
-Allow: /images/
-Allow: /css/
-Allow: /js/
-Allow: /fancybox/
+Disallow: /images/
+Disallow: /css/
+Disallow: /js/
+Disallow: /fancybox/
 Sitemap: https://zhwangart.github.io/sitemap.xml
 Sitemap: https://zhwangart.github.io/baidusitemap.xml
