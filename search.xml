@@ -3,51 +3,49 @@
   <entry>
     <title>如何限制容器的inode</title>
     <url>/2020/05/07/%E5%A6%82%E4%BD%95%E9%99%90%E5%88%B6%E5%AE%B9%E5%99%A8%E7%9A%84inode/</url>
-    <content><![CDATA[]]></content>
+    <content><![CDATA[<p>最近有客户对k8s提了一些需求，需要为其定制化。分配到的需求有一个是这样的：需要分配给每个容器一定数量的inode，这个需求的背景是为了防止某一个容器过多消耗宿主机的inode资源，最终导致主机不可用。</p>
+<a id="more"></a>
+
+<h2 id="技术依赖"><a href="#技术依赖" class="headerlink" title="技术依赖"></a>技术依赖</h2><p>下面简单对一些依赖的技术进行描述。</p>
+<h3 id="inode"><a href="#inode" class="headerlink" title="inode"></a>inode</h3><p>在linux中，一切皆文件。文件的数据存储在block（块）中，我们需要一个地方存储文件的元信息，比如文件的大小、时间戳、<strong>block位置</strong>等等，这种存储文件元信息的区域就叫做inode。如果把blocks看作一本书的话，inode就是这本书的索引。</p>
+<p>inode的数量是固定的（因系统而异），在分区创建完成后会确定下来；每个文件至少对应一个inode，如果文件的数量过多，把inode消耗光，则不能创建出新的文件。</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> df -i</span></span><br><span class="line">Filesystem      Inodes  IUsed   IFree IUse% Mounted on</span><br><span class="line">udev           2032387    398 2031989    1% /dev</span><br><span class="line">tmpfs          2037595   1224 2036371    1% /run</span><br><span class="line">/dev/vda1      3276800 325180 2951620   10% /</span><br><span class="line">tmpfs          2037595      7 2037588    1% /dev/shm</span><br><span class="line">tmpfs          2037595      4 2037591    1% /run/lock</span><br><span class="line">tmpfs          2037595     16 2037579    1% /sys/fs/cgroup</span><br></pre></td></tr></table></figure>
+
+<h3 id="xfs"><a href="#xfs" class="headerlink" title="xfs"></a>xfs</h3><p>在xfs文件系统上，可以使用<a href="https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/managing_file_systems/limiting-storage-space-usage-with-quotas_managing-file-systems#managing-file-system-quotas-in-xfs_limiting-storage-space-usage-with-quotas" target="_blank" rel="noopener">xfs_quota</a>工具来管理并为<strong>project控制的目录</strong>配置限额。</p>
+<h4 id="Quota-Types"><a href="#Quota-Types" class="headerlink" title="Quota Types"></a>Quota Types</h4><p>xfs_quota支持<a href="https://xfs.org/docs/xfsdocs-xml-dev/XFS_User_Guide//tmp/en-US/html/ch08s02.html" target="_blank" rel="noopener">三种类型</a>：users、groups、projects，在本项目中利用的是xfs_quota对projects（对应docker rootfs目录）的限制。</p>
+<h4 id="前提"><a href="#前提" class="headerlink" title="前提"></a>前提</h4><p>分区被格式化为xfs文件系统后，在mount时需要启用pquota（p也就是project）：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> mount -o pquota /dev/sda1 /path</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="示例"><a href="#示例" class="headerlink" title="示例"></a>示例</h4><ol>
+<li><p>将project控制的目录添加到/etc/projects。例如，下面命令将ID为11的/var/xfs-test/test路径添加到/etc/projects（这个ID可以是任意数值）：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> <span class="built_in">echo</span> 11:/project-path &gt;&gt; /etc/projects</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>将project名称添加到/etc/projid，将project名称与ID对应起来。例如，下面命令将一个名为tests的project与上一步中定义的project ID 11关联：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> <span class="built_in">echo</span> project-name:11 &gt;&gt; /etc/projid</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>初始化project目录。例如，下面命令初始化project目录/var：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> xfs_quota -x -c <span class="string">'project -s roject-name'</span> mount-point</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>为初始化后的project配置配额：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> xfs_quota -x -c <span class="string">'limit -p ihard=1000 roject-name'</span> mount-point</span></span><br></pre></td></tr></table></figure>
+
+</li>
+</ol>
+<h4 id="效果"><a href="#效果" class="headerlink" title="效果"></a>效果</h4><p>我这里xfs文件系统分区的挂载点是/var/xfs-test。</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> xfs_quota</span></span><br><span class="line"><span class="meta">xfs_quota&gt;</span><span class="bash"> df -i</span></span><br><span class="line">Filesystem              Inodes      IUsed      IFree IUse% Pathname</span><br><span class="line">/dev/sda1            244192768          5  244192763    0% /var/xfs-test</span><br><span class="line">/dev/sda1                 1000          1  244192762    0% /var/xfs-test/test</span><br></pre></td></tr></table></figure>
+
+<p>可以看到project /var/xfs-test/test的Inodes总量已经被限制在1000了，至于IFree（空闲可用量）为什么不应该为Inodes - IUsed = 999，这个后面会分析。</p>
+<h3 id="overlay2"><a href="#overlay2" class="headerlink" title="overlay2"></a>overlay2</h3><h2 id="核心实现"><a href="#核心实现" class="headerlink" title="核心实现"></a>核心实现</h2><h2 id="遇到的问题"><a href="#遇到的问题" class="headerlink" title="遇到的问题"></a>遇到的问题</h2>]]></content>
       <categories>
         <category>Docker</category>
       </categories>
   </entry>
   <entry>
-    <title>解析Go Slice</title>
-    <url>/2020/05/04/%E8%A7%A3%E6%9E%90Go-Slice/</url>
-    <content><![CDATA[<p>slice（切片）是Go中一种基本的数据结构，是对数组的一个连续片段的<strong>引用</strong>，这个片段可以是整个数组，也可以是数组的子集。</p>
-<a id="more"></a>
-
-<h2 id="数据结构"><a href="#数据结构" class="headerlink" title="数据结构"></a>数据结构</h2><p>切片本身并不是动态数组或者数组指针。它内部实现的数据结构<strong>通过指针引用底层数组</strong>，设定相关属性（长度和容量）将数据读写操作限定在指定区域内。</p>
-<p>数组一经初始化，长度就固定了；切片的长度可以在运行时修改，可以看成是长度可变的数组，应该注意的是切片的底层其实就是数组。</p>
-<p>slice的数据结构定义如下：</p>
-<figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="keyword">type</span> slice <span class="keyword">struct</span> &#123;</span><br><span class="line">	array unsafe.Pointer</span><br><span class="line">	<span class="built_in">len</span>   <span class="keyword">int</span></span><br><span class="line">	<span class="built_in">cap</span>   <span class="keyword">int</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>切片的结构体由3部分构成，array是指向一个数组的指针，len 代表当前切片的长度，cap 是当前切片的容量。cap 总是大于等于 len 的。</p>
-<h2 id="创建与初始化"><a href="#创建与初始化" class="headerlink" title="创建与初始化"></a>创建与初始化</h2><h3 id="使用make"><a href="#使用make" class="headerlink" title="使用make"></a>使用make</h3><figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 创建一个长度和容量都为3的切片</span></span><br><span class="line">slice := <span class="built_in">make</span>([]<span class="keyword">int</span>, <span class="number">3</span>)</span><br><span class="line"><span class="comment">// 创建一个长度为3，容量为5的切片</span></span><br><span class="line">slice := <span class="built_in">make</span>([]<span class="keyword">int</span>, <span class="number">3</span>， <span class="number">5</span>)</span><br></pre></td></tr></table></figure>
-
-<h3 id="空切片"><a href="#空切片" class="headerlink" title="空切片"></a>空切片</h3><figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="keyword">var</span> slice []<span class="keyword">int</span> <span class="comment">//如果指定了大小，则为创建数组</span></span><br></pre></td></tr></table></figure>
-
-<h3 id="从数组或切片生成新的切片"><a href="#从数组或切片生成新的切片" class="headerlink" title="从数组或切片生成新的切片"></a>从数组或切片生成新的切片</h3><p>语法为：</p>
-<figure class="highlight go"><table><tr><td class="code"><pre><span class="line">newSlice := oldSlice[开始位置：结束位置]</span><br></pre></td></tr></table></figure>
-
-<p>示例：</p>
-<figure class="highlight go"><table><tr><td class="code"><pre><span class="line">a := [<span class="number">10</span>]<span class="keyword">int</span>&#123;<span class="number">0</span>,<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>,<span class="number">6</span>,<span class="number">7</span>,<span class="number">8</span>,<span class="number">9</span>&#125;</span><br><span class="line">slice := a[<span class="number">1</span>:<span class="number">8</span>] <span class="comment">//1,2,3,4,5,6,7</span></span><br><span class="line">newSlice := slice[<span class="number">0</span>:<span class="number">3</span>] <span class="comment">//1,2,3</span></span><br></pre></td></tr></table></figure>
-
-<h2 id="实际应用"><a href="#实际应用" class="headerlink" title="实际应用"></a>实际应用</h2><h3 id="copy"><a href="#copy" class="headerlink" title="copy()"></a>copy()</h3><p>可以将一个slice拷贝到另一个slice中。</p>
-<figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">copy</span><span class="params">(dst, src []Type)</span> <span class="title">int</span></span></span><br></pre></td></tr></table></figure>
-
-<p>这表示将src slice拷贝到dst slice，src比dst长，就截断，src比dst短，则只拷贝src那部分。copy的返回值是拷贝成功的元素数量，所以也就是src slice或dst slice中最小的那个长度。</p>
-<p>例如：</p>
-<figure class="highlight go"><table><tr><td class="code"><pre><span class="line">s1 := []<span class="keyword">int</span>&#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;</span><br><span class="line">s2 := <span class="built_in">make</span>([]<span class="keyword">int</span>, <span class="number">5</span>)</span><br><span class="line">s3 := <span class="built_in">make</span>([]<span class="keyword">int</span>,<span class="number">2</span>)</span><br><span class="line"></span><br><span class="line">num := <span class="built_in">copy</span>(s2, s1)</span><br><span class="line"><span class="built_in">copy</span>(s3,s1)</span><br><span class="line"></span><br><span class="line">fmt.Println(num)   <span class="comment">// 3</span></span><br><span class="line">fmt.Println(s2)    <span class="comment">// [1,2,3,0,0]</span></span><br><span class="line">fmt.Println(s3)    <span class="comment">// [1,2]</span></span><br></pre></td></tr></table></figure>
-
-<h3 id="append"><a href="#append" class="headerlink" title="append()"></a>append()</h3><p>可以使用append()函数对slice进行扩展，因为它追加元素到slice中，所以一定会增加slice的长度。如果增加后的长度超出的slice的容量，则要对slice进行扩容，也就是申请新的容量更大数组给切片。具体策略以后会专门讲一下。</p>
-<figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="keyword">var</span> s []<span class="keyword">int</span></span><br><span class="line">newS := <span class="built_in">append</span>(s, <span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">fmt.Println(s)</span><br><span class="line">fmt.Println(newS)</span><br></pre></td></tr></table></figure>
-
-<h3 id="栈与队列"><a href="#栈与队列" class="headerlink" title="栈与队列"></a>栈与队列</h3><p>Go中没有实现栈与队列的数据结构，通过操作slice可以实现它们的功能。</p>
-<h4 id="栈"><a href="#栈" class="headerlink" title="栈"></a>栈</h4><figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="keyword">var</span> stack []element</span><br><span class="line"><span class="comment">// push</span></span><br><span class="line">stack = <span class="built_in">append</span>(stack, x)</span><br><span class="line"><span class="comment">// top</span></span><br><span class="line">top := stack[<span class="built_in">len</span>(stack)<span class="number">-1</span>]</span><br><span class="line"><span class="comment">// pop</span></span><br><span class="line">stack = stack[:<span class="built_in">len</span>(s)<span class="number">-1</span>]</span><br></pre></td></tr></table></figure>
-
-<h4 id="队列"><a href="#队列" class="headerlink" title="队列"></a>队列</h4><figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="keyword">var</span> queue []element</span><br><span class="line"><span class="comment">// push</span></span><br><span class="line">queue = <span class="built_in">append</span>(queue, x)</span><br><span class="line"><span class="comment">// top</span></span><br><span class="line">top := queue[<span class="number">0</span>]</span><br><span class="line"><span class="comment">// pop</span></span><br><span class="line">queue = queue[<span class="number">1</span>:]</span><br></pre></td></tr></table></figure>
-
-]]></content>
+    <title>cgroup原理解析与应用</title>
+    <url>/2020/05/08/cgroup%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90%E4%B8%8E%E5%BA%94%E7%94%A8/</url>
+    <content><![CDATA[]]></content>
       <categories>
-        <category>Go</category>
+        <category>Linux</category>
       </categories>
   </entry>
   <entry>
@@ -111,6 +109,48 @@
 ]]></content>
       <categories>
         <category>Algorithm</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>解析Go Slice</title>
+    <url>/2020/05/04/%E8%A7%A3%E6%9E%90Go-Slice/</url>
+    <content><![CDATA[<p>slice（切片）是Go中一种基本的数据结构，是对数组的一个连续片段的<strong>引用</strong>，这个片段可以是整个数组，也可以是数组的子集。</p>
+<a id="more"></a>
+
+<h2 id="数据结构"><a href="#数据结构" class="headerlink" title="数据结构"></a>数据结构</h2><p>切片本身并不是动态数组或者数组指针。它内部实现的数据结构<strong>通过指针引用底层数组</strong>，设定相关属性（长度和容量）将数据读写操作限定在指定区域内。</p>
+<p>数组一经初始化，长度就固定了；切片的长度可以在运行时修改，可以看成是长度可变的数组，应该注意的是切片的底层其实就是数组。</p>
+<p>slice的数据结构定义如下：</p>
+<figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="keyword">type</span> slice <span class="keyword">struct</span> &#123;</span><br><span class="line">	array unsafe.Pointer</span><br><span class="line">	<span class="built_in">len</span>   <span class="keyword">int</span></span><br><span class="line">	<span class="built_in">cap</span>   <span class="keyword">int</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>切片的结构体由3部分构成，array是指向一个数组的指针，len 代表当前切片的长度，cap 是当前切片的容量。cap 总是大于等于 len 的。</p>
+<h2 id="创建与初始化"><a href="#创建与初始化" class="headerlink" title="创建与初始化"></a>创建与初始化</h2><h3 id="使用make"><a href="#使用make" class="headerlink" title="使用make"></a>使用make</h3><figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 创建一个长度和容量都为3的切片</span></span><br><span class="line">slice := <span class="built_in">make</span>([]<span class="keyword">int</span>, <span class="number">3</span>)</span><br><span class="line"><span class="comment">// 创建一个长度为3，容量为5的切片</span></span><br><span class="line">slice := <span class="built_in">make</span>([]<span class="keyword">int</span>, <span class="number">3</span>， <span class="number">5</span>)</span><br></pre></td></tr></table></figure>
+
+<h3 id="空切片"><a href="#空切片" class="headerlink" title="空切片"></a>空切片</h3><figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="keyword">var</span> slice []<span class="keyword">int</span> <span class="comment">//如果指定了大小，则为创建数组</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="从数组或切片生成新的切片"><a href="#从数组或切片生成新的切片" class="headerlink" title="从数组或切片生成新的切片"></a>从数组或切片生成新的切片</h3><p>语法为：</p>
+<figure class="highlight go"><table><tr><td class="code"><pre><span class="line">newSlice := oldSlice[开始位置：结束位置]</span><br></pre></td></tr></table></figure>
+
+<p>示例：</p>
+<figure class="highlight go"><table><tr><td class="code"><pre><span class="line">a := [<span class="number">10</span>]<span class="keyword">int</span>&#123;<span class="number">0</span>,<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>,<span class="number">6</span>,<span class="number">7</span>,<span class="number">8</span>,<span class="number">9</span>&#125;</span><br><span class="line">slice := a[<span class="number">1</span>:<span class="number">8</span>] <span class="comment">//1,2,3,4,5,6,7</span></span><br><span class="line">newSlice := slice[<span class="number">0</span>:<span class="number">3</span>] <span class="comment">//1,2,3</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="实际应用"><a href="#实际应用" class="headerlink" title="实际应用"></a>实际应用</h2><h3 id="copy"><a href="#copy" class="headerlink" title="copy()"></a>copy()</h3><p>可以将一个slice拷贝到另一个slice中。</p>
+<figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">copy</span><span class="params">(dst, src []Type)</span> <span class="title">int</span></span></span><br></pre></td></tr></table></figure>
+
+<p>这表示将src slice拷贝到dst slice，src比dst长，就截断，src比dst短，则只拷贝src那部分。copy的返回值是拷贝成功的元素数量，所以也就是src slice或dst slice中最小的那个长度。</p>
+<p>例如：</p>
+<figure class="highlight go"><table><tr><td class="code"><pre><span class="line">s1 := []<span class="keyword">int</span>&#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;</span><br><span class="line">s2 := <span class="built_in">make</span>([]<span class="keyword">int</span>, <span class="number">5</span>)</span><br><span class="line">s3 := <span class="built_in">make</span>([]<span class="keyword">int</span>,<span class="number">2</span>)</span><br><span class="line"></span><br><span class="line">num := <span class="built_in">copy</span>(s2, s1)</span><br><span class="line"><span class="built_in">copy</span>(s3,s1)</span><br><span class="line"></span><br><span class="line">fmt.Println(num)   <span class="comment">// 3</span></span><br><span class="line">fmt.Println(s2)    <span class="comment">// [1,2,3,0,0]</span></span><br><span class="line">fmt.Println(s3)    <span class="comment">// [1,2]</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="append"><a href="#append" class="headerlink" title="append()"></a>append()</h3><p>可以使用append()函数对slice进行扩展，因为它追加元素到slice中，所以一定会增加slice的长度。如果增加后的长度超出的slice的容量，则要对slice进行扩容，也就是申请新的容量更大数组给切片。具体策略以后会专门讲一下。</p>
+<figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="keyword">var</span> s []<span class="keyword">int</span></span><br><span class="line">newS := <span class="built_in">append</span>(s, <span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">fmt.Println(s)</span><br><span class="line">fmt.Println(newS)</span><br></pre></td></tr></table></figure>
+
+<h3 id="栈与队列"><a href="#栈与队列" class="headerlink" title="栈与队列"></a>栈与队列</h3><p>Go中没有实现栈与队列的数据结构，通过操作slice可以实现它们的功能。</p>
+<h4 id="栈"><a href="#栈" class="headerlink" title="栈"></a>栈</h4><figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="keyword">var</span> stack []element</span><br><span class="line"><span class="comment">// push</span></span><br><span class="line">stack = <span class="built_in">append</span>(stack, x)</span><br><span class="line"><span class="comment">// top</span></span><br><span class="line">top := stack[<span class="built_in">len</span>(stack)<span class="number">-1</span>]</span><br><span class="line"><span class="comment">// pop</span></span><br><span class="line">stack = stack[:<span class="built_in">len</span>(s)<span class="number">-1</span>]</span><br></pre></td></tr></table></figure>
+
+<h4 id="队列"><a href="#队列" class="headerlink" title="队列"></a>队列</h4><figure class="highlight go"><table><tr><td class="code"><pre><span class="line"><span class="keyword">var</span> queue []element</span><br><span class="line"><span class="comment">// push</span></span><br><span class="line">queue = <span class="built_in">append</span>(queue, x)</span><br><span class="line"><span class="comment">// top</span></span><br><span class="line">top := queue[<span class="number">0</span>]</span><br><span class="line"><span class="comment">// pop</span></span><br><span class="line">queue = queue[<span class="number">1</span>:]</span><br></pre></td></tr></table></figure>
+
+]]></content>
+      <categories>
+        <category>Go</category>
       </categories>
   </entry>
 </search>

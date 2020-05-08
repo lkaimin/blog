@@ -63,6 +63,8 @@
 
                         
                             
+    <div class="tocbot"></div>
+
 
 
 
@@ -76,11 +78,43 @@
                                             
 
                                                 
-                                                                    
+                                                                    <p>最近有客户对k8s提了一些需求，需要为其定制化。分配到的需求有一个是这样的：需要分配给每个容器一定数量的inode，这个需求的背景是为了防止某一个容器过多消耗宿主机的inode资源，最终导致主机不可用。</p>
+<a id="more"></a>
+
+<h2 id="技术依赖"><a href="#技术依赖" class="headerlink" title="技术依赖"></a>技术依赖</h2><p>下面简单对一些依赖的技术进行描述。</p>
+<h3 id="inode"><a href="#inode" class="headerlink" title="inode"></a>inode</h3><p>在linux中，一切皆文件。文件的数据存储在block（块）中，我们需要一个地方存储文件的元信息，比如文件的大小、时间戳、<strong>block位置</strong>等等，这种存储文件元信息的区域就叫做inode。如果把blocks看作一本书的话，inode就是这本书的索引。</p>
+<p>inode的数量是固定的（因系统而异），在分区创建完成后会确定下来；每个文件至少对应一个inode，如果文件的数量过多，把inode消耗光，则不能创建出新的文件。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> df -i</span></span><br><span class="line">Filesystem      Inodes  IUsed   IFree IUse% Mounted on</span><br><span class="line">udev           2032387    398 2031989    1% /dev</span><br><span class="line">tmpfs          2037595   1224 2036371    1% /run</span><br><span class="line">/dev/vda1      3276800 325180 2951620   10% /</span><br><span class="line">tmpfs          2037595      7 2037588    1% /dev/shm</span><br><span class="line">tmpfs          2037595      4 2037591    1% /run/lock</span><br><span class="line">tmpfs          2037595     16 2037579    1% /sys/fs/cgroup</span><br></pre></td></tr></table></figure>
+
+<h3 id="xfs"><a href="#xfs" class="headerlink" title="xfs"></a>xfs</h3><p>在xfs文件系统上，可以使用<a href="https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/managing_file_systems/limiting-storage-space-usage-with-quotas_managing-file-systems#managing-file-system-quotas-in-xfs_limiting-storage-space-usage-with-quotas" target="_blank" rel="noopener">xfs_quota</a>工具来管理并为<strong>project控制的目录</strong>配置限额。</p>
+<h4 id="Quota-Types"><a href="#Quota-Types" class="headerlink" title="Quota Types"></a>Quota Types</h4><p>xfs_quota支持<a href="https://xfs.org/docs/xfsdocs-xml-dev/XFS_User_Guide//tmp/en-US/html/ch08s02.html" target="_blank" rel="noopener">三种类型</a>：users、groups、projects，在本项目中利用的是xfs_quota对projects（对应docker rootfs目录）的限制。</p>
+<h4 id="前提"><a href="#前提" class="headerlink" title="前提"></a>前提</h4><p>分区被格式化为xfs文件系统后，在mount时需要启用pquota（p也就是project）：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> mount -o pquota /dev/sda1 /path</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="示例"><a href="#示例" class="headerlink" title="示例"></a>示例</h4><ol>
+<li><p>将project控制的目录添加到/etc/projects。例如，下面命令将ID为11的/var/xfs-test/test路径添加到/etc/projects（这个ID可以是任意数值）：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> <span class="built_in">echo</span> 11:/project-path &gt;&gt; /etc/projects</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>将project名称添加到/etc/projid，将project名称与ID对应起来。例如，下面命令将一个名为tests的project与上一步中定义的project ID 11关联：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> <span class="built_in">echo</span> project-name:11 &gt;&gt; /etc/projid</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>初始化project目录。例如，下面命令初始化project目录/var：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> xfs_quota -x -c <span class="string">'project -s roject-name'</span> mount-point</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>为初始化后的project配置配额：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> xfs_quota -x -c <span class="string">'limit -p ihard=1000 roject-name'</span> mount-point</span></span><br></pre></td></tr></table></figure>
+
+</li>
+</ol>
+<h4 id="效果"><a href="#效果" class="headerlink" title="效果"></a>效果</h4><p>我这里xfs文件系统分区的挂载点是/var/xfs-test。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> xfs_quota</span></span><br><span class="line"><span class="meta">xfs_quota&gt;</span><span class="bash"> df -i</span></span><br><span class="line">Filesystem              Inodes      IUsed      IFree IUse% Pathname</span><br><span class="line">/dev/sda1            244192768          5  244192763    0% /var/xfs-test</span><br><span class="line">/dev/sda1                 1000          1  244192762    0% /var/xfs-test/test</span><br></pre></td></tr></table></figure>
+
+<p>可以看到project /var/xfs-test/test的Inodes总量已经被限制在1000了，至于IFree（空闲可用量）为什么不应该为Inodes - IUsed = 999，这个后面会分析。</p>
+<h3 id="overlay2"><a href="#overlay2" class="headerlink" title="overlay2"></a>overlay2</h3><h2 id="核心实现"><a href="#核心实现" class="headerlink" title="核心实现"></a>核心实现</h2><h2 id="遇到的问题"><a href="#遇到的问题" class="headerlink" title="遇到的问题"></a>遇到的问题</h2>
                                                                         
                                     </div>
                                     <footer class="article-footer">
-                                        <a data-url="https://lkaimin.cn/2020/05/07/%E5%A6%82%E4%BD%95%E9%99%90%E5%88%B6%E5%AE%B9%E5%99%A8%E7%9A%84inode/" data-id="ck9wzy26a00009ow19262gazk" class="article-share-link">
+                                        <a data-url="https://lkaimin.cn/2020/05/07/%E5%A6%82%E4%BD%95%E9%99%90%E5%88%B6%E5%AE%B9%E5%99%A8%E7%9A%84inode/" data-id="ck9ycyaqn0000x0w19vnwdf2n" class="article-share-link">
                                             分享
                                         </a>
                                         
@@ -91,6 +125,15 @@
     
         
   <nav class="article-nav">
+    
+      <a href="/2020/05/08/cgroup%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90%E4%B8%8E%E5%BA%94%E7%94%A8/" class="article-nav-link">
+        <strong class="article-nav-caption">前一篇</strong>
+        <div class="article-nav-title">
+          
+            cgroup原理解析与应用
+          
+        </div>
+      </a>
     
     
       <a href="/2020/05/05/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95/" class="article-nav-link">
