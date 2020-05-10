@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>
+    Docker存储驱动之overlay2 |
+    
+    非宁静无以致远</title>
+  
+    <link rel="shortcut icon" href="/favicon.ico">
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+    
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+
+  
+  
+<script src="/js/pace.min.js"></script>
+
+<meta name="generator" content="Hexo 4.2.0"></head>
+
+<body>
+<main class="content">
+  <section class="outer">
+  <article id="post-Docker存储驱动之overlay2" class="article article-type-post" itemscope itemprop="blogPost" data-scroll-reveal>
+
+    <div class="article-inner">
+        
+            <header class="article-header">
+                
+  
+    <h1 class="article-title" itemprop="name">
+      Docker存储驱动之overlay2
+    </h1>
+  
+  
+
+
+
+
+            </header>
+            
+
+                
+                    <div class="article-meta">
+                        <a href="/2020/05/10/Docker%E5%AD%98%E5%82%A8%E9%A9%B1%E5%8A%A8%E4%B9%8Boverlay2/" class="article-date">
+  <time datetime="2020-05-10T06:12:09.000Z" itemprop="datePublished">2020-05-10</time>
+</a>
+                            
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/Docker/">Docker</a>
+  </div>
+
+                    </div>
+                    
+
+                        
+                            
+    <div class="tocbot"></div>
+
+
+
+
+
+                                
+
+                                    <div class="article-entry" itemprop="articleBody">
+                                        
+
+
+                                            
+
+                                                
+                                                                    <p>OverlayFS是一种联合文件系统(union filesystem)，速度更快且实现更简单。docker为OverlayFS提供了两种存储驱动程序：overlay和更新更稳定的overlay2。这里主要探究一下overlay2。</p>
+<a id="more"></a>
+
+<h2 id="前提条件"><a href="#前提条件" class="headerlink" title="前提条件"></a>前提条件</h2><ul>
+<li><p>Docker EE &gt;= 17.06.02-ee5</p>
+</li>
+<li><p>kernel version &gt;= 4.0</p>
+</li>
+<li><p>初始化文件系统时启用d_type</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mkfs.xfs -f -n ftype=1 /dev/sda1</span><br></pre></td></tr></table></figure>
+
+</li>
+</ul>
+<h2 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h2><p><img src="https://github.com/lkaimin/blog-image/blob/master/Docker/overlay_constructs.jpg?raw=true" alt="overlayfs lowerdir, upperdir, merged"></p>
+<p>官方解释晦涩难懂，按照我的理解，OverlayF在单主机上有两个分层的目录：一个叫lowerdir，为底层目录，用来保存docker镜像，为<strong>只读</strong>区；一个叫upperdir，为上层目录，用来存储容器信息，<strong>可读可写</strong>。</p>
+<p>当需要修改一个lower层文件时，这个文件从lower层被复制到upper层，结果也保存在upper层。此外从上图可以看到，两层目录被挂载（union mount）在同一目录merged下面，这就导致如果容器层（upper）和镜像层（lower）有相同的文件的时候，容器层的文件会覆盖镜像层的文件。当然，这个文件就是被复制到容器层，修改后的文件。</p>
+<h2 id="overlay2磁盘结构"><a href="#overlay2磁盘结构" class="headerlink" title="overlay2磁盘结构"></a>overlay2磁盘结构</h2><h3 id="镜像"><a href="#镜像" class="headerlink" title="镜像"></a>镜像</h3><p>使用<code>docker pull nginx</code>下载nginx镜像，可以看到在<code>/var/lib/docker/overlay2</code>目录下有4个文件夹：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> ll /var/lib/docker/overlay2/</span></span><br><span class="line">total 0</span><br><span class="line">drwx------  6 root root  256 5月  10 11:39 ./</span><br><span class="line">drwx--x--x 15 root root  196 5月  10 10:51 ../</span><br><span class="line">drwx------  4 root root   55 5月  10 11:39 6128b62e9037bdb01c8860496e7f3aafe353b5ae14e0e07ec3d7df877ad066f7/</span><br><span class="line">drwx------  3 root root   30 5月  10 11:39 7c4a16de2a7fa59f3450021d82d5988f8d21dcc1b7e34635dacfed4d11daab79/</span><br><span class="line">brw-------  1 root root 8, 1 5月  10 10:51 backingFsBlockDev</span><br><span class="line">drwx------  4 root root   55 5月  10 11:39 be06206409a5622251e482a26c77152541423ca4c3ef0beed2561854f90f2616/</span><br><span class="line">drwx------  2 root root  108 5月  10 11:39 l/</span><br></pre></td></tr></table></figure>
+
+<p>l（小写L）目录下面是符号链接，为缩短的层标识符。这些标识符用于避免在执行mount命令时，目录名达到长度限制。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> ll /var/lib/docker/overlay2/l</span></span><br><span class="line">total 0</span><br><span class="line">drwx------ 2 root root 108 5月  10 11:39 ./</span><br><span class="line">drwx------ 6 root root 256 5月  10 11:39 ../</span><br><span class="line">lrwxrwxrwx 1 root root  72 5月  10 11:39 NHX4BRCCEW2AZGIWV7BMORZMJA -&gt; ../7c4a16de2a7fa59f3450021d82d5988f8d21dcc1b7e34635dacfed4d11daab79/diff/</span><br><span class="line">lrwxrwxrwx 1 root root  72 5月  10 11:39 QA6S4LFB2CHSSFURVDVCMMSZAO -&gt; ../6128b62e9037bdb01c8860496e7f3aafe353b5ae14e0e07ec3d7df877ad066f7/diff/</span><br><span class="line">lrwxrwxrwx 1 root root  72 5月  10 11:39 ZVCJMCHUHPAYMLZAKW3OZ7QM4S -&gt; ../be06206409a5622251e482a26c77152541423ca4c3ef0beed2561854f90f2616/diff/</span><br></pre></td></tr></table></figure>
+
+<p>最底层目录有一个名为link的文件，其中保存的就是这个目录的层标识符，与<code>/var/lib/docker/overlay2/l</code>内文件一一对应；还有一个名为diff的目录，目录下为这一层的文件（也就是镜像本身）。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> ls /var/lib/docker/overlay2/7c4a16de2a7fa59f3450021d82d5988f8d21dcc1b7e34635dacfed4d11daab79</span></span><br><span class="line">diff  link</span><br><span class="line"><span class="meta">#</span><span class="bash"> cat /var/lib/docker/overlay2/7c4a16de2a7fa59f3450021d82d5988f8d21dcc1b7e34635dacfed4d11daab79/link</span></span><br><span class="line">NHX4BRCCEW2AZGIWV7BMORZMJA</span><br><span class="line"><span class="meta">#</span><span class="bash"> ls /var/lib/docker/overlay2/7c4a16de2a7fa59f3450021d82d5988f8d21dcc1b7e34635dacfed4d11daab79/diff/</span></span><br><span class="line">bin  boot  dev  etc  home  lib  lib64  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var</span><br></pre></td></tr></table></figure>
+
+<p>剩下的每一层（非最底层），都包含一个名为lower的文件（内容为最底层目录link）和一个名为diff的目录，该目录下为这一层的文件；还有一个work目录，供OverlayFS内部使用。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> ls /var/lib/docker/overlay2/6128b62e9037bdb01c8860496e7f3aafe353b5ae14e0e07ec3d7df877ad066f7/</span></span><br><span class="line">diff  link  lower  work</span><br><span class="line"><span class="meta">#</span><span class="bash"> cat /var/lib/docker/overlay2/6128b62e9037bdb01c8860496e7f3aafe353b5ae14e0e07ec3d7df877ad066f7/lower</span></span><br><span class="line">l/NHX4BRCCEW2AZGIWV7BMORZMJA</span><br><span class="line"><span class="meta">#</span><span class="bash"> ls /var/lib/docker/overlay2/6128b62e9037bdb01c8860496e7f3aafe353b5ae14e0e07ec3d7df877ad066f7/diff/</span></span><br><span class="line">etc  lib  tmp  usr  var</span><br></pre></td></tr></table></figure>
+
+<h3 id="容器"><a href="#容器" class="headerlink" title="容器"></a>容器</h3><p>创建一个容器，再次查看<code>/var/lib/docker/overlay2</code>下的文件夹，发现新创建了两个文件夹：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> ll /var/lib/docker/overlay2</span></span><br><span class="line">total 4</span><br><span class="line">drwx------  8 root root 4096 5月  10 13:41 ./</span><br><span class="line">drwx--x--x 15 root root  196 5月  10 10:51 ../</span><br><span class="line">drwx------  4 root root   55 5月  10 11:39 6128b62e9037bdb01c8860496e7f3aafe353b5ae14e0e07ec3d7df877ad066f7/</span><br><span class="line">drwx------  3 root root   30 5月  10 11:39 7c4a16de2a7fa59f3450021d82d5988f8d21dcc1b7e34635dacfed4d11daab79/</span><br><span class="line">brw-------  1 root root 8, 1 5月  10 10:51 backingFsBlockDev</span><br><span class="line">drwx------  4 root root   55 5月  10 11:39 be06206409a5622251e482a26c77152541423ca4c3ef0beed2561854f90f2616/</span><br><span class="line">drwx------  5 root root   69 5月  10 13:41 ce14dbee402ec758d5b5109b59050ac3feee7fcda97bb89f37a644127dce5a27/</span><br><span class="line">drwx------  4 root root   55 5月  10 13:41 ce14dbee402ec758d5b5109b59050ac3feee7fcda97bb89f37a644127dce5a27-init/</span><br><span class="line">drwx------  2 root root  176 5月  10 13:41 l/</span><br></pre></td></tr></table></figure>
+
+<p><code>/var/lib/docker/overlay2/ce14dbee402ec758d5b5109b59050ac3feee7fcda97bb89f37a644127dce5a27</code>下面有一个merged目录，这个目录就是前面<a href="####原理">原理</a>中提到的merged层：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> ls /var/lib/docker/overlay2/ce14dbee402ec758d5b5109b59050ac3feee7fcda97bb89f37a644127dce5a27/merged/</span></span><br><span class="line">bin  boot  dev  etc  home  lib  lib64  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var</span><br></pre></td></tr></table></figure>
+
+<p>使用<code>mount | grep overlay</code>命令可以看到：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> mount | grep overlay</span></span><br><span class="line">overlay on /var/lib/docker/overlay2/ce14dbee402ec758d5b5109b59050ac3feee7fcda97bb89f37a644127dce5a27/merged type overlay (rw,relatime,lowerdir=/var/lib/docker/overlay2/l/VOSX3PR2MFM3SC724XJXZD44Q6:/var/lib/docker/overlay2/l/ZVCJMCHUHPAYMLZAKW3OZ7QM4S:/var/lib/docker/overlay2/l/QA6S4LFB2CHSSFURVDVCMMSZAO:/var/lib/docker/overlay2/l/NHX4BRCCEW2AZGIWV7BMORZMJA,upperdir=/var/lib/docker/overlay2/ce14dbee402ec758d5b5109b59050ac3feee7fcda97bb89f37a644127dce5a27/diff,workdir=/var/lib/docker/overlay2/ce14dbee402ec758d5b5109b59050ac3feee7fcda97bb89f37a644127dce5a27/work)</span><br></pre></td></tr></table></figure>
+
+<p>lowerdir（镜像层）即为nginx镜像那三层目录，upperdir（容器层）为容器本身所包含的不同于镜像层的所有文件，两层目录被挂载在同一目录merged（即<strong>容器根目录</strong>）下面，<strong>形成了进入容器中你能看到的所有文件</strong>。</p>
+
+                                                                        
+                                    </div>
+                                    <footer class="article-footer">
+                                        <a data-url="https://lkaimin.cn/2020/05/10/Docker%E5%AD%98%E5%82%A8%E9%A9%B1%E5%8A%A8%E4%B9%8Boverlay2/" data-id="cka0okdmp0000pgw1dg7dao9u" class="article-share-link">
+                                            分享
+                                        </a>
+                                        
+                                    </footer>
+
+    </div>
+
+    
+        
+  <nav class="article-nav">
+    
+    
+      <a href="/2020/05/09/%E4%BD%BF%E7%94%A8CRD%E6%89%A9%E5%B1%95K8s-API%E5%AE%9E%E7%8E%B0%E5%BA%94%E7%94%A8%E6%89%B9%E9%87%8F%E9%83%A8%E7%BD%B2%E5%92%8C%E5%8D%87%E7%BA%A7/" class="article-nav-link">
+        <strong class="article-nav-caption">后一篇</strong>
+        <div class="article-nav-title">使用CRD扩展K8s API实现应用批量部署和升级</div>
+      </a>
+    
+  </nav>
+
+
+            
+
+                
+                    
+                        
+                            
+
+</article>
+</section>
+  <footer class="footer">
+  <div class="outer">
+    <div class="float-right">
+      <ul class="list-inline">
+  
+    <li><i class="fe fe-smile-alt"></i> <span id="busuanzi_value_site_uv"></span></li>
+  
+    <li><i class="fe fe-bookmark"></i> <span id="busuanzi_value_page_pv"></span></li>
+  
+</ul>
+    </div>
+    <!--<ul class="list-inline">
+      <li>&copy; 2020 非宁静无以致远</li>
+      <li>Powered by <a href="http://hexo.io/" target="_blank">Hexo</a></li>
+      <li>Theme  <a href="https://github.com/zhwangart/hexo-theme-ocean" target="_blank" rel="noopener">Ocean</a></li>
+    </ul> -->
+    <p style="text-align:center">&copy; 2020 非宁静无以致远</p>
+  </div>
+</footer>
+
+</main>
+<aside class="sidebar">
+  <button class="navbar-toggle"></button>
+<nav class="navbar">
+  
+    <div class="logo">
+      <a href="/"><img src="/images/head.png" alt="非宁静无以致远"></a>
+    </div>
+  
+  <ul class="nav nav-main">
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/">主页</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/archives">归档</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/categories">分类</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/about">关于</a>
+      </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link nav-item-search" title="搜索">
+        <i class="fe fe-search"></i>
+        搜索
+      </a>
+    </li>
+  </ul>
+</nav>
+<nav class="navbar navbar-bottom">
+  <ul class="nav">
+    <li class="nav-item">
+      <div class="totop" id="totop">
+  <i class="fe fe-rocket"></i>
+</div>
+    </li>
+    <li class="nav-item">
+      
+        <a class="nav-item-link" target="_blank" href="/atom.xml" title="RSS Feed">
+          <i class="fe fe-feed"></i>
+        </a>
+      
+    </li>
+  </ul>
+</nav>
+<div class="search-form-wrap">
+  <div class="local-search local-search-plugin">
+  <input type="search" id="local-search-input" class="local-search-input" placeholder="Search...">
+  <div id="local-search-result" class="local-search-result"></div>
+</div>
+</div>
+</aside>
+
+<script src="/js/jquery-2.0.3.min.js"></script>
+
+
+<script src="/js/jquery.justifiedGallery.min.js"></script>
+
+
+<script src="/js/lazyload.min.js"></script>
+
+
+<script src="/js/busuanzi-2.3.pure.min.js"></script>
+
+
+  
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+  
+<script src="/js/tocbot.min.js"></script>
+
+  <script>
+    // Tocbot_v4.7.0  http://tscanlin.github.io/tocbot/
+    tocbot.init({
+      tocSelector: '.tocbot',
+      contentSelector: '.article-entry',
+      headingSelector: 'h1, h2, h3, h4, h5, h6',
+      hasInnerContainers: true,
+      scrollSmooth: true,
+      positionFixedSelector: '.tocbot',
+      positionFixedClass: 'is-position-fixed',
+      fixedSidebarOffset: 'auto',
+    });
+  </script>
+
+
+
+<script src="/js/ocean.js"></script>
+
+
+</body>
+</html>
