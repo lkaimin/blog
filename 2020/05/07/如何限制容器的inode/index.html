@@ -111,12 +111,12 @@
 
 <p>可以看到project <code>/var/xfs-test/test</code>的Inodes总量已经被限制在1000了，至于IFree（空闲可用量）为什么不应该为<code>Inodes - IUsed = 999</code>，这个后面会分析。</p>
 <h3 id="overlay2"><a href="#overlay2" class="headerlink" title="overlay2"></a>overlay2</h3><p><a href="https://docs.docker.com/storage/storagedriver/overlayfs-driver/" target="_blank" rel="noopener">docker文档</a>中提到OverlayFS是一种联合文件系统(union filesystem)，速度更快且实现更简单。docker为OverlayFS提供了两种存储驱动程序：overlay和更新更稳定的overlay2。overlay2在inode利用率方便比overlay更有效，所以推荐使用更新的overlay2。</p>
-<p>关于overlay2的详细细节，有兴趣请<a href="https://lkaimin.cn/2020/05/10/Docker存储驱动之overlay2/">跳转</a>。</p>
+<p>关于overlay2的详细细节，有兴趣请<a href="/2020/05/10/Docker%E5%AD%98%E5%82%A8%E9%A9%B1%E5%8A%A8%E4%B9%8Boverlay2/" title="跳转">跳转</a>。</p>
 <h2 id="核心实现"><a href="#核心实现" class="headerlink" title="核心实现"></a>核心实现</h2><h2 id="遇到的问题"><a href="#遇到的问题" class="headerlink" title="遇到的问题"></a>遇到的问题</h2>
                                                                         
                                     </div>
                                     <footer class="article-footer">
-                                        <a data-url="https://lkaimin.cn/2020/05/07/%E5%A6%82%E4%BD%95%E9%99%90%E5%88%B6%E5%AE%B9%E5%99%A8%E7%9A%84inode/" data-id="cka0oqyct0009o4w19qz9g0u7" class="article-share-link">
+                                        <a data-url="https://lkaimin.cn/2020/05/07/%E5%A6%82%E4%BD%95%E9%99%90%E5%88%B6%E5%AE%B9%E5%99%A8%E7%9A%84inode/" data-id="cka0p90wp0007b8w17oozamjp" class="article-share-link">
                                             分享
                                         </a>
                                         
