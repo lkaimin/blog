@@ -78,7 +78,7 @@
                                             
 
                                                 
-                                                                    <p>最近有客户对k8s提了一些需求，需要为其定制化。有一个需求是这样的：需要分配给每个容器一定数量的inode，这个需求的背景是为了防止某一个容器过多消耗宿主机的inode资源，最终导致主机不可用。</p>
+                                                                    <p>最近有client对k8s提了一些需求，需要为其定制化。有一个需求是这样的：需要分配给每个容器一定数量的inode，这个需求的背景是为了防止某一个容器过多消耗宿主机的inode资源，最终导致主机不可用。</p>
 <a id="more"></a>
 
 <h2 id="技术依赖"><a href="#技术依赖" class="headerlink" title="技术依赖"></a>技术依赖</h2><p>要实现这个需求，需要使用overlay2存储驱动和xfs文件系统，下面简单对一些依赖的技术进行描述。</p>
@@ -111,12 +111,41 @@
 
 <p>可以看到project <code>/var/xfs-test/test</code>的Inodes总量已经被限制在1000了，至于IFree（空闲可用量）为什么不应该为<code>Inodes - IUsed = 999</code>，这个后面会分析。</p>
 <h3 id="overlay2"><a href="#overlay2" class="headerlink" title="overlay2"></a>overlay2</h3><p><a href="https://docs.docker.com/storage/storagedriver/overlayfs-driver/" target="_blank" rel="noopener">docker文档</a>中提到OverlayFS是一种联合文件系统(union filesystem)，速度更快且实现更简单。docker为OverlayFS提供了两种存储驱动程序：overlay和更新更稳定的overlay2。overlay2在inode利用率方便比overlay更有效，所以推荐使用更新的overlay2。</p>
-<p>关于overlay2的详细细节，有兴趣请<a href="/2020/05/10/Docker%E5%AD%98%E5%82%A8%E9%A9%B1%E5%8A%A8%E4%B9%8Boverlay2/" title="跳转">跳转</a>。</p>
-<h2 id="核心实现"><a href="#核心实现" class="headerlink" title="核心实现"></a>核心实现</h2><h2 id="遇到的问题"><a href="#遇到的问题" class="headerlink" title="遇到的问题"></a>遇到的问题</h2>
+<p>关于overlay2的详细细节，有兴趣请看<a href="/2020/05/10/Docker%E5%AD%98%E5%82%A8%E9%A9%B1%E5%8A%A8%E4%B9%8Boverlay2/" title="Docker存储驱动之overlay2">Docker存储驱动之overlay2</a>。</p>
+<h2 id="核心实现"><a href="#核心实现" class="headerlink" title="核心实现"></a>核心实现</h2><p>docker<a href="https://docs.docker.com/engine/reference/commandline/run/#set-storage-driver-options-per-container" target="_blank" rel="noopener">官方文档</a>中有提到在<code>docker run</code>时，overlay2也是支持通过<code>--storage-opt size=10G</code>选项来设置容器根目录大小的，而且通过研究overlay2，可以发现这部分的工作是docker daemon在<strong>创建读写层</strong>的时候完成的。</p>
+<p>这个需求是在docker 18.03.1上进行的修改，整体的调用链如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">daemon.setRWLayer(container)</span><br><span class="line">	---&gt;ls.driver.CreateReadWrite(m.mountID, pid, createOpts)</span><br><span class="line">		---&gt;d.create(id, parent, opts)</span><br><span class="line">			---&gt;d.quotaCtl.SetQuota(dir, driver.options.quota)</span><br></pre></td></tr></table></figure>
+
+<p><code>CreateReadWrite</code>这个接口会调用到docker具体使用的存储驱动的实现，在这个场景下（也就是overlay2），是调用到了<code>daemon/graphdriver/overlay2/overlay.go</code>中的<code>CreateReadWrite</code>函数，在<code>overlay.go</code>中进行了参数的一些校验之后，最后调用到核心函数<code>SetQuota</code>：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// setProjectQuota - set the quota for project id on xfs block device</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">setProjectQuota</span><span class="params">(backingFsBlockDev <span class="keyword">string</span>, projectID <span class="keyword">uint32</span>, quota Quota)</span> <span class="title">error</span></span> &#123;</span><br><span class="line">	<span class="keyword">var</span> d C.fs_disk_quota_t</span><br><span class="line">	d.d_version = C.FS_DQUOT_VERSION</span><br><span class="line">	d.d_id = C.__u32(projectID)</span><br><span class="line">	d.d_flags = C.XFS_PROJ_QUOTA</span><br><span class="line"></span><br><span class="line">	d.d_fieldmask = C.FS_DQ_BHARD | C.FS_DQ_BSOFT | C.FS_DQ_IHARD | C.FS_DQ_ISOFT</span><br><span class="line">	d.d_blk_hardlimit = C.__u64(quota.Size / <span class="number">512</span>)</span><br><span class="line">	d.d_blk_softlimit = d.d_blk_hardlimit</span><br><span class="line"></span><br><span class="line">	d.d_ino_hardlimit = C.__u64(quota.InodeCount)</span><br><span class="line">	d.d_ino_softlimit = d.d_ino_hardlimit</span><br><span class="line"></span><br><span class="line">	<span class="keyword">var</span> cs = C.CString(backingFsBlockDev)</span><br><span class="line">	<span class="keyword">defer</span> C.free(unsafe.Pointer(cs))</span><br><span class="line"></span><br><span class="line">	_, _, errno := unix.Syscall6(unix.SYS_QUOTACTL, C.Q_XSETPQLIM,</span><br><span class="line">		<span class="keyword">uintptr</span>(unsafe.Pointer(cs)), <span class="keyword">uintptr</span>(d.d_id),</span><br><span class="line">		<span class="keyword">uintptr</span>(unsafe.Pointer(&amp;d)), <span class="number">0</span>, <span class="number">0</span>)</span><br><span class="line">	<span class="keyword">if</span> errno != <span class="number">0</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> fmt.Errorf(<span class="string">"Failed to set quota limit for projid %d on %s: %v"</span>,</span><br><span class="line">			projectID, backingFsBlockDev, errno.Error())</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在对容器size和inode进行配置之后，调用了系统函数<code>quotactl</code>，感兴趣的同学可以看一下这部分的<a href="https://elixir.bootlin.com/linux/v4.10/source/fs/quota/quota.c#L835" target="_blank" rel="noopener">Linux源码</a>。</p>
+<h2 id="效果-1"><a href="#效果-1" class="headerlink" title="效果"></a>效果</h2><p>首先先编译dockerd，由于我自己主机上装的就是18.03.1的docker，就直接替换了dockerd二进制：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> docker version</span></span><br><span class="line">Client:</span><br><span class="line"> Version:      18.03.1-ce</span><br><span class="line"> API version:  1.37</span><br><span class="line"> Go version:   go1.9.5</span><br><span class="line"> Git commit:   9ee9f40</span><br><span class="line"> Built:        Thu Apr 26 07:17:20 2018</span><br><span class="line"> OS/Arch:      linux/amd64</span><br><span class="line"> Experimental: false</span><br><span class="line"> Orchestrator: swarm</span><br><span class="line"></span><br><span class="line">Server:</span><br><span class="line"> Engine:</span><br><span class="line">  Version:      dev			//忘了加version</span><br><span class="line">  API version:  1.37 (minimum version 1.12)</span><br><span class="line">  Go version:   go1.9.5</span><br><span class="line">  Git commit:   unsupported</span><br><span class="line">  Built:        Sun May 10 12:35:01 2020</span><br><span class="line">  OS/Arch:      linux/amd64</span><br><span class="line">  Experimental: false</span><br></pre></td></tr></table></figure>
+
+<p>编辑<code>/etc/docker/daemon.json</code>，输入以下配置：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="attr">"storage-opts"</span>: [</span><br><span class="line">    	<span class="string">"overlay2.size=10G"</span>,</span><br><span class="line">    	<span class="string">"overlay2.inode_count=1000"</span></span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>创建容器，使用<code>df -h</code>和<code>df -i</code>命令查看是否生效：</p>
+<p><img src="https://github.com/lkaimin/blog-image/blob/master/Linux/df_bug.jpg?raw=true" alt="df_bug.jpg"></p>
+<p>细心的同学可以发现<code>df -i</code>得到的结果是不正确的，跟前面是同样的问题。通过脚本在容器中不断创建文件去消耗inode，可以看到，limit是起了作用的：</p>
+<p><img src="https://github.com/lkaimin/blog-image/blob/master/Linux/df_bug_expend.jpg?raw=true" alt="df_bug_expend.jpg"></p>
+<h2 id="问题分析"><a href="#问题分析" class="headerlink" title="问题分析"></a>问题分析</h2><p>既然<code>df -i</code>得到的结果有问题，那就去分析df的<a href="https://github.com/coreutils/gnulib/blob/48a6c46b/lib/fsusage.c#L112" target="_blank" rel="noopener">源码</a>，df调用的是内核中的<code>statfs()</code>函数（<code>/fs/statfs.c</code>），继续往下走，在xfs文件系统中调用的是<code>xfs_fs_statfs()</code>函数（<code>/fs/xfs/xfs_super.c</code>），调用栈如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">xfs_fs_statfs()</span><br><span class="line">	---&gt;xfs_qm_statvfs()</span><br><span class="line">		---&gt;xfs_qm_dqget()</span><br><span class="line">			---&gt;xfs_fill_statvfs_from_dquot()</span><br></pre></td></tr></table></figure>
+
+<p>下面详细看一下<code>xfs_fill_statvfs_from_dquot()</code>函数：</p>
+<p><img src="https://github.com/lkaimin/blog-image/blob/master/Linux/xfs_fill_statvfs_from_dquot.jpg?raw=true" alt="xfs_fill_statvfs_from_dquot.jpg"></p>
+<p>入参statp保存的是<code>xfs_fs_statfs()</code>函数拿到的superblock（超级块）的block和inode使用量信息，入参dqp保存的是<code>xfs_qm_dqget()</code>函数拿到的对应project（也就是容器根目录）的block和inode使用量信息。</p>
+<p>为什么<code>df -h</code>得到的block信息是正常的呢？仔细看一下f_bfree（block空闲值）的计算方式，再看一下f_ffree（inode空闲值）的计算方式，可以发现，f_ffree的计算方式是错误的，原来写内核的大佬也会马虎O(∩_∩)O，应该用f_files（inode总量）减去使用量：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (limit &amp;&amp; statp-&gt;f_files &gt; limit) &#123;</span><br><span class="line">		statp-&gt;f_files = limit;</span><br><span class="line">		statp-&gt;f_ffree =</span><br><span class="line">			(statp-&gt;f_files &gt; dqp-&gt;q_res_icount) ?</span><br><span class="line">			 (statp-&gt;f_files - dqp-&gt;q_res_icount) : <span class="number">0</span>;</span><br><span class="line">	&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个bug在内核<strong>4.19.21</strong>中得到修复，升级内核版本后就ok啦。</p>
+<p>至此，这个功能就算实现了，有兴趣的同学可以一起交流。</p>
+
                                                                         
                                     </div>
                                     <footer class="article-footer">
-                                        <a data-url="https://lkaimin.cn/2020/05/07/%E5%A6%82%E4%BD%95%E9%99%90%E5%88%B6%E5%AE%B9%E5%99%A8%E7%9A%84inode/" data-id="cka0p90wp0007b8w17oozamjp" class="article-share-link">
+                                        <a data-url="https://lkaimin.cn/2020/05/07/%E5%A6%82%E4%BD%95%E9%99%90%E5%88%B6%E5%AE%B9%E5%99%A8%E7%9A%84inode/" data-id="cka13ordk000200w11iesdvaf" class="article-share-link">
                                             分享
                                         </a>
                                         
@@ -128,11 +157,11 @@
         
   <nav class="article-nav">
     
-      <a href="/2020/05/08/cgroup%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90%E4%B8%8E%E5%BA%94%E7%94%A8/" class="article-nav-link">
+      <a href="/2020/05/10/Docker%E5%AD%98%E5%82%A8%E9%A9%B1%E5%8A%A8%E4%B9%8Boverlay2/" class="article-nav-link">
         <strong class="article-nav-caption">前一篇</strong>
         <div class="article-nav-title">
           
-            cgroup原理解析与应用
+            Docker存储驱动之overlay2
           
         </div>
       </a>
