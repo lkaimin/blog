@@ -47,19 +47,19 @@
       </categories>
   </entry>
   <entry>
-    <title>使用CRD扩展K8s API实现应用批量部署和升级</title>
-    <url>/2020/05/09/%E4%BD%BF%E7%94%A8CRD%E6%89%A9%E5%B1%95K8s-API%E5%AE%9E%E7%8E%B0%E5%BA%94%E7%94%A8%E6%89%B9%E9%87%8F%E9%83%A8%E7%BD%B2%E5%92%8C%E5%8D%87%E7%BA%A7/</url>
-    <content><![CDATA[]]></content>
-      <categories>
-        <category>Kubernetes</category>
-      </categories>
-  </entry>
-  <entry>
     <title>cgroup原理解析与应用</title>
     <url>/2020/05/08/cgroup%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90%E4%B8%8E%E5%BA%94%E7%94%A8/</url>
     <content><![CDATA[]]></content>
       <categories>
         <category>Linux</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>使用CRD扩展K8s API实现应用批量部署和升级</title>
+    <url>/2020/05/09/%E4%BD%BF%E7%94%A8CRD%E6%89%A9%E5%B1%95K8s-API%E5%AE%9E%E7%8E%B0%E5%BA%94%E7%94%A8%E6%89%B9%E9%87%8F%E9%83%A8%E7%BD%B2%E5%92%8C%E5%8D%87%E7%BA%A7/</url>
+    <content><![CDATA[]]></content>
+      <categories>
+        <category>Kubernetes</category>
       </categories>
   </entry>
   <entry>
@@ -203,7 +203,7 @@
 
 <p>可以看到project <code>/var/xfs-test/test</code>的Inodes总量已经被限制在1000了，至于IFree（空闲可用量）为什么不应该为<code>Inodes - IUsed = 999</code>，这个后面会分析。</p>
 <h3 id="overlay2"><a href="#overlay2" class="headerlink" title="overlay2"></a>overlay2</h3><p><a href="https://docs.docker.com/storage/storagedriver/overlayfs-driver/" target="_blank" rel="noopener">docker文档</a>中提到OverlayFS是一种联合文件系统(union filesystem)，速度更快且实现更简单。docker为OverlayFS提供了两种存储驱动程序：overlay和更新更稳定的overlay2。overlay2在inode利用率方便比overlay更有效，所以推荐使用更新的overlay2。</p>
-<p>关于overlay2的详细细节，有兴趣请<a href="[https://lkaimin.cn/2020/05/08/cgroup%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90%E4%B8%8E%E5%BA%94%E7%94%A8/](http://lkaimin.cn/2020/05/08/cgroup原理解析与应用/)">跳转</a>。</p>
+<p>关于overlay2的详细细节，有兴趣请<a href="https://lkaimin.cn/2020/05/10/Docker存储驱动之overlay2/">跳转</a>。</p>
 <h2 id="核心实现"><a href="#核心实现" class="headerlink" title="核心实现"></a>核心实现</h2><h2 id="遇到的问题"><a href="#遇到的问题" class="headerlink" title="遇到的问题"></a>遇到的问题</h2>]]></content>
       <categories>
         <category>Docker</category>
