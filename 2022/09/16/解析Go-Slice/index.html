@@ -20,28 +20,33 @@
     var CONFIG = {"hostname":"lkaimin.github.io","root":"/blog/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
   </script>
 
-  <meta property="og:type" content="website">
-<meta property="og:title" content="非宁静无以致远">
-<meta property="og:url" content="https://lkaimin.github.io/blog/index.html">
+  <meta name="description" content="slice（切片）是Go中一种基本的数据结构，是对数组的一个连续片段的引用，这个片段可以是整个数组，也可以是数组的子集。 数据结构切片本身并不是动态数组或者数组指针。它内部实现的数据结构通过指针引用底层数组，设定相关属性（长度和容量）将数据读写操作限定在指定区域内。 数组一经初始化，长度就固定了；切片的长度可以在运行时修改，可以看成是长度可变的数组，应该注意的是切片的底层其实就是数组。 slice">
+<meta property="og:type" content="article">
+<meta property="og:title" content="解析Go Slice">
+<meta property="og:url" content="https://lkaimin.github.io/blog/2022/09/16/%E8%A7%A3%E6%9E%90Go-Slice/index.html">
 <meta property="og:site_name" content="非宁静无以致远">
+<meta property="og:description" content="slice（切片）是Go中一种基本的数据结构，是对数组的一个连续片段的引用，这个片段可以是整个数组，也可以是数组的子集。 数据结构切片本身并不是动态数组或者数组指针。它内部实现的数据结构通过指针引用底层数组，设定相关属性（长度和容量）将数据读写操作限定在指定区域内。 数组一经初始化，长度就固定了；切片的长度可以在运行时修改，可以看成是长度可变的数组，应该注意的是切片的底层其实就是数组。 slice">
 <meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-09-16T08:11:49.000Z">
+<meta property="article:modified_time" content="2022-09-16T08:32:37.462Z">
 <meta property="article:author" content="lkm">
+<meta property="article:tag" content="Go">
 <meta name="twitter:card" content="summary">
 
-<link rel="canonical" href="https://lkaimin.github.io/blog/">
+<link rel="canonical" href="https://lkaimin.github.io/blog/2022/09/16/%E8%A7%A3%E6%9E%90Go-Slice/">
 
 
 <script id="page-configurations">
   // https://hexo.io/docs/variables.html
   CONFIG.page = {
     sidebar: "",
-    isHome : true,
-    isPost : false,
+    isHome : false,
+    isPost : true,
     lang   : 'zh-CN'
   };
 </script>
 
-  <title>非宁静无以致远</title>
+  <title>解析Go Slice | 非宁静无以致远</title>
   
 
 
@@ -139,66 +144,10 @@
         <div class="content-wrap">
           
 
-          <div class="content index posts-expand">
+          <div class="content post posts-expand">
             
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://lkaimin.github.io/blog/2022/09/16/%E5%A6%82%E4%BD%95%E9%99%90%E5%88%B6%E5%AE%B9%E5%99%A8%E7%9A%84inode/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/blog/images/avatar.gif">
-      <meta itemprop="name" content="lkm">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="非宁静无以致远">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/blog/2022/09/16/%E5%A6%82%E4%BD%95%E9%99%90%E5%88%B6%E5%AE%B9%E5%99%A8%E7%9A%84inode/" class="post-title-link" itemprop="url">如何限制容器的inode</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-09-16 16:34:14" itemprop="dateCreated datePublished" datetime="2022-09-16T16:34:14+08:00">2022-09-16</time>
-            </span>
-
-          
-
-        </div>
-      </header>
 
     
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
@@ -214,10 +163,9 @@
       <meta itemprop="name" content="非宁静无以致远">
     </span>
       <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/blog/2022/09/16/%E8%A7%A3%E6%9E%90Go-Slice/" class="post-title-link" itemprop="url">解析Go Slice</a>
-        </h2>
+        <h1 class="post-title" itemprop="name headline">
+          解析Go Slice
+        </h1>
 
         <div class="post-meta">
             <span class="post-meta-item">
@@ -241,7 +189,7 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <p>slice（切片）是Go中一种基本的数据结构，是对数组的一个连续片段的<strong>引用</strong>，这个片段可以是整个数组，也可以是数组的子集。</p>
+        <p>slice（切片）是Go中一种基本的数据结构，是对数组的一个连续片段的<strong>引用</strong>，这个片段可以是整个数组，也可以是数组的子集。</p>
 <h2 id="数据结构"><a href="#数据结构" class="headerlink" title="数据结构"></a>数据结构</h2><p>切片本身并不是动态数组或者数组指针。它内部实现的数据结构<strong>通过指针引用底层数组</strong>，设定相关属性（长度和容量）将数据读写操作限定在指定区域内。</p>
 <p>数组一经初始化，长度就固定了；切片的长度可以在运行时修改，可以看成是长度可变的数组，应该注意的是切片的底层其实就是数组。</p>
 <p>slice的数据结构定义如下：</p>
@@ -273,21 +221,33 @@
 
 <h4 id="队列"><a href="#队列" class="headerlink" title="队列"></a>队列</h4><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> queue []element</span><br><span class="line"><span class="comment">// push</span></span><br><span class="line">queue = <span class="built_in">append</span>(queue, x)</span><br><span class="line"><span class="comment">// top</span></span><br><span class="line">top := queue[<span class="number">0</span>]</span><br><span class="line"><span class="comment">// pop</span></span><br><span class="line">queue = queue[<span class="number">1</span>:]</span><br></pre></td></tr></table></figure>
 
-      
     </div>
 
     
     
     
+
       <footer class="post-footer">
-        <div class="post-eof"></div>
+          <div class="post-tags">
+              <a href="/blog/tags/Go/" rel="tag"># Go</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item"></div>
+      <div class="post-nav-item">
+    <a href="/blog/2022/09/16/%E5%A6%82%E4%BD%95%E9%99%90%E5%88%B6%E5%AE%B9%E5%99%A8%E7%9A%84inode/" rel="next" title="如何限制容器的inode">
+      如何限制容器的inode <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
       </footer>
+    
   </article>
   
   
-  
-
-
   
 
 
@@ -340,6 +300,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84"><span class="nav-number">1.</span> <span class="nav-text">数据结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E4%B8%8E%E5%88%9D%E5%A7%8B%E5%8C%96"><span class="nav-number">2.</span> <span class="nav-text">创建与初始化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8make"><span class="nav-number">2.1.</span> <span class="nav-text">使用make</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A9%BA%E5%88%87%E7%89%87"><span class="nav-number">2.2.</span> <span class="nav-text">空切片</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%8E%E6%95%B0%E7%BB%84%E6%88%96%E5%88%87%E7%89%87%E7%94%9F%E6%88%90%E6%96%B0%E7%9A%84%E5%88%87%E7%89%87"><span class="nav-number">2.3.</span> <span class="nav-text">从数组或切片生成新的切片</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E9%99%85%E5%BA%94%E7%94%A8"><span class="nav-number">3.</span> <span class="nav-text">实际应用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#copy"><span class="nav-number">3.1.</span> <span class="nav-text">copy()</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#append"><span class="nav-number">3.2.</span> <span class="nav-text">append()</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A0%88%E4%B8%8E%E9%98%9F%E5%88%97"><span class="nav-number">3.3.</span> <span class="nav-text">栈与队列</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%A0%88"><span class="nav-number">3.3.1.</span> <span class="nav-text">栈</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%98%9F%E5%88%97"><span class="nav-number">3.3.2.</span> <span class="nav-text">队列</span></a></li></ol></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
