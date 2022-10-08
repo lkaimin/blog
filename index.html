@@ -150,6 +150,65 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://lkaimin.github.io/blog/2022/10/08/%E5%88%9B%E5%BB%BASlice%E6%97%B6%E7%9A%843%E4%B8%AA%E7%B4%A2%E5%BC%95/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/blog/images/avatar.gif">
+      <meta itemprop="name" content="lkm">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="非宁静无以致远">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/blog/2022/10/08/%E5%88%9B%E5%BB%BASlice%E6%97%B6%E7%9A%843%E4%B8%AA%E7%B4%A2%E5%BC%95/" class="post-title-link" itemprop="url">创建Slice时的3个索引</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-10-08 17:13:30 / 修改时间：17:13:52" itemprop="dateCreated datePublished" datetime="2022-10-08T17:13:30+08:00">2022-10-08</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>在解析Slice的文章中有提到如何通过数组或切片赋值新的切片，这里将详细探讨一下创建Slice时的3个索引。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://lkaimin.github.io/blog/2022/09/16/%E5%A6%82%E4%BD%95%E9%99%90%E5%88%B6%E5%AE%B9%E5%99%A8%E7%9A%84inode/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -239,7 +298,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-10-08 16:44:13" itemprop="dateModified" datetime="2022-10-08T16:44:13+08:00">2022-10-08</time>
+                <time title="修改时间：2022-10-08 17:36:52" itemprop="dateModified" datetime="2022-10-08T17:36:52+08:00">2022-10-08</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -295,17 +354,25 @@
 <blockquote>
 <p>思考：slice和newSlice的长度和容量分别是多少？</p>
 </blockquote>
+<p>执行完上述代码后，有了两个切片，它们共享同一段底层数组，但通过不同的切片会看到底层数组的不同部分。</p>
 <p><img src="/blog/images/Go/slice.jpg"></p>
+<p>第一个切片slice能够看到底层数组全部5个元素，对于第二个切片newSlice，它无法访问所指向的底层数组的第一个元素之前的部分。</p>
+<blockquote>
+<p>新切片的长度和容量：对底层数组容量是k的切片slice[i:j]来说，长度&#x3D;j - i，容量&#x3D;k - i；当不指定j时，j&#x3D;k。上面slice的长度、容量都为5，newSlice的长度、容量分别为2和4。</p>
+</blockquote>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">slice := []<span class="type">int</span>&#123;<span class="number">10</span>, <span class="number">20</span>, <span class="number">30</span>, <span class="number">40</span>, <span class="number">50</span>&#125;</span><br><span class="line">newSlice := slice[<span class="number">1</span>:<span class="number">3</span>]</span><br><span class="line">newSlice[<span class="number">1</span>] = <span class="number">35</span></span><br><span class="line"><span class="comment">// slice = [10 20 35 40 50]</span></span><br><span class="line"><span class="comment">// newSlice = [20 35]</span></span><br></pre></td></tr></table></figure>
+
+<p>现在两个切片指向同一个底层数组，如果一个切片修改了底层数组的值，另一个切片也能感知到。</p>
 <h3 id="copy"><a href="#copy" class="headerlink" title="copy()"></a>copy()</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">copy</span><span class="params">(dst, src []Type)</span></span> <span class="type">int</span></span><br></pre></td></tr></table></figure>
 
 <p>这表示将src slice拷贝到dst slice，src比dst长，就截断，src比dst短，则只拷贝src那部分。copy的返回值是拷贝成功的元素数量，所以也就是src slice或dst slice中最小的那个长度。</p>
 <p>例如：</p>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">s1 := []<span class="type">int</span>&#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;</span><br><span class="line">s2 := <span class="built_in">make</span>([]<span class="type">int</span>, <span class="number">5</span>)</span><br><span class="line">s3 := <span class="built_in">make</span>([]<span class="type">int</span>,<span class="number">2</span>)</span><br><span class="line"></span><br><span class="line">num := <span class="built_in">copy</span>(s2, s1)</span><br><span class="line"><span class="built_in">copy</span>(s3,s1)</span><br><span class="line"></span><br><span class="line">fmt.Println(num)   <span class="comment">// 3</span></span><br><span class="line">fmt.Println(s2)    <span class="comment">// [1,2,3,0,0]</span></span><br><span class="line">fmt.Println(s3)    <span class="comment">// [1,2]</span></span><br></pre></td></tr></table></figure>
 
-<h3 id="append"><a href="#append" class="headerlink" title="append()"></a>append()</h3><p>可以使用append()函数对slice进行扩展，因为它追加元素到slice中，所以一定会增加slice的长度。如果增加后的长度超出的slice的容量，则要对slice进行扩容，也就是申请新的容量更大数组给切片。具体策略以后会专门讲一下。</p>
+<h3 id="append"><a href="#append" class="headerlink" title="append()"></a>append()</h3><p>可以使用append()函数对slice进行扩展，因为它追加元素到slice中，所以一定会增加slice的长度。如果增加后的长度超出的slice的容量，则要对slice进行扩容，也就是申请新的容量更大数组给切片。TODO: append策略</p>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> s []<span class="type">int</span></span><br><span class="line">newS := <span class="built_in">append</span>(s, <span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">fmt.Println(s)</span><br><span class="line">fmt.Println(newS)</span><br></pre></td></tr></table></figure>
 
-<h3 id="栈与队列"><a href="#栈与队列" class="headerlink" title="栈与队列"></a>栈与队列</h3><p>Go中没有实现栈与队列的数据结构，通过操作slice可以实现它们的功能。</p>
+<h3 id="迭代切片"><a href="#迭代切片" class="headerlink" title="迭代切片"></a>迭代切片</h3><h3 id="多维切片"><a href="#多维切片" class="headerlink" title="多维切片"></a>多维切片</h3><h3 id="栈与队列"><a href="#栈与队列" class="headerlink" title="栈与队列"></a>栈与队列</h3><p>Go中没有实现栈与队列的数据结构，通过操作slice可以实现它们的功能。</p>
 <h4 id="栈"><a href="#栈" class="headerlink" title="栈"></a>栈</h4><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> stack []element</span><br><span class="line"><span class="comment">// push</span></span><br><span class="line">stack = <span class="built_in">append</span>(stack, x)</span><br><span class="line"><span class="comment">// top</span></span><br><span class="line">top := stack[<span class="built_in">len</span>(stack)<span class="number">-1</span>]</span><br><span class="line"><span class="comment">// pop</span></span><br><span class="line">stack = stack[:<span class="built_in">len</span>(s)<span class="number">-1</span>]</span><br></pre></td></tr></table></figure>
 
 <h4 id="队列"><a href="#队列" class="headerlink" title="队列"></a>队列</h4><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> queue []element</span><br><span class="line"><span class="comment">// push</span></span><br><span class="line">queue = <span class="built_in">append</span>(queue, x)</span><br><span class="line"><span class="comment">// top</span></span><br><span class="line">top := queue[<span class="number">0</span>]</span><br><span class="line"><span class="comment">// pop</span></span><br><span class="line">queue = queue[<span class="number">1</span>:]</span><br></pre></td></tr></table></figure>
@@ -390,7 +457,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/blog/archives/">
         
-          <span class="site-state-item-count">2</span>
+          <span class="site-state-item-count">3</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
