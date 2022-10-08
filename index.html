@@ -231,10 +231,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2022-09-16 16:11:49 / 修改时间：16:55:58" itemprop="dateCreated datePublished" datetime="2022-09-16T16:11:49+08:00">2022-09-16</time>
+              <time title="创建时间：2022-09-16 16:11:49" itemprop="dateCreated datePublished" datetime="2022-09-16T16:11:49+08:00">2022-09-16</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-08 16:44:13" itemprop="dateModified" datetime="2022-10-08T16:44:13+08:00">2022-10-08</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -260,21 +266,37 @@
 <h2 id="数据结构"><a href="#数据结构" class="headerlink" title="数据结构"></a>数据结构</h2><p>切片本身并不是动态数组或者数组指针。它内部实现的数据结构<strong>通过指针引用底层数组</strong>，设定相关属性（长度和容量）将数据读写操作限定在指定区域内。</p>
 <p>数组一经初始化，长度就固定了；切片的长度可以在运行时修改，可以看成是长度可变的数组，应该注意的是切片的底层其实就是数组。</p>
 <p>slice的数据结构定义如下：</p>
-<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> slice <span class="keyword">struct</span> &#123;</span><br><span class="line">	array unsafe.Pointer</span><br><span class="line">	<span class="built_in">len</span>   <span class="type">int</span></span><br><span class="line">	<span class="built_in">cap</span>   <span class="type">int</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> slice <span class="keyword">struct</span> &#123;</span><br><span class="line">    array unsafe.Pointer</span><br><span class="line">    <span class="built_in">len</span>   <span class="type">int</span></span><br><span class="line">    <span class="built_in">cap</span>   <span class="type">int</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>切片的结构体由3部分构成，array是指向一个数组的指针，len 代表当前切片的长度，cap 是当前切片的容量。cap 总是大于等于 len 的。</p>
-<h2 id="创建与初始化"><a href="#创建与初始化" class="headerlink" title="创建与初始化"></a>创建与初始化</h2><h3 id="使用make"><a href="#使用make" class="headerlink" title="使用make"></a>使用make</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 创建一个长度和容量都为3的切片</span></span><br><span class="line">slice := <span class="built_in">make</span>([]<span class="type">int</span>, <span class="number">3</span>)</span><br><span class="line"><span class="comment">// 创建一个长度为3，容量为5的切片</span></span><br><span class="line">slice := <span class="built_in">make</span>([]<span class="type">int</span>, <span class="number">3</span>， <span class="number">5</span>)</span><br></pre></td></tr></table></figure>
+<p>切片的结构体由3部分构成，array是指向一个数组的指针，len 代表当前切片的长度，cap 是当前切片的容量；cap 总是大于等于 len 的。</p>
+<h2 id="创建与初始化"><a href="#创建与初始化" class="headerlink" title="创建与初始化"></a>创建与初始化</h2><h3 id="make函数"><a href="#make函数" class="headerlink" title="make函数"></a>make函数</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 创建一个长度和容量都为3的切片</span></span><br><span class="line">slice := <span class="built_in">make</span>([]<span class="type">int</span>, <span class="number">3</span>)</span><br></pre></td></tr></table></figure>
 
-<h3 id="空切片"><a href="#空切片" class="headerlink" title="空切片"></a>空切片</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> slice []<span class="type">int</span> <span class="comment">//如果指定了大小，则为创建数组</span></span><br></pre></td></tr></table></figure>
+<p>如果只指定长度，那么切片的容量和长度相等。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 创建一个长度为3，容量为5的切片</span></span><br><span class="line">slice := <span class="built_in">make</span>([]<span class="type">int</span>, <span class="number">3</span>， <span class="number">5</span>)</span><br></pre></td></tr></table></figure>
 
-<h3 id="从数组或切片生成新的切片"><a href="#从数组或切片生成新的切片" class="headerlink" title="从数组或切片生成新的切片"></a>从数组或切片生成新的切片</h3><p>语法为：</p>
+<p>分别指定长度和容量时，切片的容量是底层数组的长度。但是初始化后，切片并不能访问所有的数组元素，只能访问3个元素；剩余的2个元素可以通过append()添加到切片中。</p>
+<h3 id="切片字面量"><a href="#切片字面量" class="headerlink" title="切片字面量"></a>切片字面量</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 长度和容量都为3</span></span><br><span class="line">slice := []<span class="type">string</span>&#123;<span class="string">&quot;A&quot;</span>, <span class="string">&quot;B&quot;</span>, <span class="string">&quot;C&quot;</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>切片的长度和容量会基于初始化时提供的元素个数确定。</p>
+<h3 id="索引声明"><a href="#索引声明" class="headerlink" title="索引声明"></a>索引声明</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 使用空字符串初始化第100个元素</span></span><br><span class="line"><span class="comment">// 长度和容量都为100</span></span><br><span class="line">slice := []<span class="type">string</span>&#123;<span class="number">99</span>: <span class="string">&quot;&quot;</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="nil切片"><a href="#nil切片" class="headerlink" title="nil切片"></a>nil切片</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 指向数组的指针值为nil</span></span><br><span class="line"><span class="keyword">var</span> slice []<span class="type">int</span> <span class="comment">//如果指定了大小，则为创建数组</span></span><br></pre></td></tr></table></figure>
+
+<p>nil切片可以用于当函数要求返回一个切片但是发生异常的时候。</p>
+<h3 id="空切片"><a href="#空切片" class="headerlink" title="空切片"></a>空切片</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">slice := <span class="built_in">make</span>([]<span class="type">int</span>, <span class="number">0</span>)</span><br><span class="line"></span><br><span class="line">slice := []<span class="type">int</span>&#123;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>空切片在底层数组包含 0 个元素，也没有分配任何存储空间。可以用于数据库查询返回 0 个查询结果时。</p>
+<h2 id="实际应用"><a href="#实际应用" class="headerlink" title="实际应用"></a>实际应用</h2><h3 id="从数组或切片生成新的切片"><a href="#从数组或切片生成新的切片" class="headerlink" title="从数组或切片生成新的切片"></a>从数组或切片生成新的切片</h3><p>语法为：</p>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">newSlice := oldSlice[开始位置：结束位置]</span><br></pre></td></tr></table></figure>
 
 <p>示例：</p>
-<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">a := [<span class="number">10</span>]<span class="type">int</span>&#123;<span class="number">0</span>,<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>,<span class="number">6</span>,<span class="number">7</span>,<span class="number">8</span>,<span class="number">9</span>&#125;</span><br><span class="line">slice := a[<span class="number">1</span>:<span class="number">8</span>] <span class="comment">//1,2,3,4,5,6,7</span></span><br><span class="line">newSlice := slice[<span class="number">0</span>:<span class="number">3</span>] <span class="comment">//1,2,3</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">a := [<span class="number">5</span>]<span class="type">int</span>&#123;<span class="number">10</span>, <span class="number">20</span>, <span class="number">30</span>, <span class="number">40</span>, <span class="number">50</span>&#125;</span><br><span class="line">slice := a[<span class="number">0</span>:] <span class="comment">//10, 20, 30, 40, 50</span></span><br><span class="line">newSlice := slice[<span class="number">1</span>:<span class="number">3</span>] <span class="comment">// 20, 30</span></span><br></pre></td></tr></table></figure>
 
-<h2 id="实际应用"><a href="#实际应用" class="headerlink" title="实际应用"></a>实际应用</h2><h3 id="copy"><a href="#copy" class="headerlink" title="copy()"></a>copy()</h3><p>可以将一个slice拷贝到另一个slice中。</p>
-<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">copy</span><span class="params">(dst, src []Type)</span></span> <span class="type">int</span></span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>思考：slice和newSlice的长度和容量分别是多少？</p>
+</blockquote>
+<p><img src="/blog/images/Go/slice.jpg"></p>
+<h3 id="copy"><a href="#copy" class="headerlink" title="copy()"></a>copy()</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">copy</span><span class="params">(dst, src []Type)</span></span> <span class="type">int</span></span><br></pre></td></tr></table></figure>
 
 <p>这表示将src slice拷贝到dst slice，src比dst长，就截断，src比dst短，则只拷贝src那部分。copy的返回值是拷贝成功的元素数量，所以也就是src slice或dst slice中最小的那个长度。</p>
 <p>例如：</p>
